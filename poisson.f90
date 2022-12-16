@@ -3,10 +3,14 @@ program poisson
   implicit none
 
   real(dp), dimension(:,:), allocatable :: U, Uold
+  real(dp), dimension(:,:), allocatable :: rho
   real(dp) :: tolerance, a, err, maxerr, w
   integer :: i,j,k, N, error
   character(1) :: M
   character(20) :: arg
+  real(dp), parameter :: Pi=3.141593_dp
+  real(dp), parameter :: e2=14.4_dp ! eV*Ang
+  
 
   if (iargc()<3) then
      write(*,*) 'poisson Method N tolerance w'
@@ -33,8 +37,12 @@ program poisson
   endif
 
   U=0.0_dp
-  
-  U(N/2-10:N/2+10, N/2-10:N/2+10) = 1.0_dp
+  U(1:N,1) = 0.0_dp
+  U(1:N,N) = 0.0_dp
+  U(1,1:N) = 0.0_dp
+  U(N,1:N) = 0.0_dp  
+  U(N/2-10:N/2+10, N/2-10) = -1.0_dp
+  U(N/2-10:N/2+10, N/2+10) = +1.0_dp
   
   select case (M)
   case("J")
@@ -48,8 +56,10 @@ program poisson
  
       do j = 2, N-1
         do i = 2, N-1
-         
-          if (i >= N/2-10 .and. i<=N/2+10 .and. j>=N/2-10 .and. j<=N/2+10) cycle  
+
+          ! if (constrained(i,j)) cycle
+           
+          if (i >= N/2-10 .and. i<=N/2+10 .and. (j==N/2-10 .or. j==N/2+10)) cycle  
           
           U(i,j) = (Uold(i-1,j) + Uold(i+1,j) + Uold(i,j-1) + Uold(i,j+1))/4.0_dp
           
@@ -77,8 +87,8 @@ program poisson
       do j = 2, N-1
         do i = 2, N-1
          
-          if (i >= N/2-10 .and. i<=N/2+10 .and. j>=N/2-10 .and. j<=N/2+10) cycle  
-          
+          if (i >= N/2-10 .and. i<=N/2+10 .and. (j==N/2-10 .or. j==N/2+10)) cycle
+           
           U(i,j) = (U(i-1,j) + Uold(i+1,j) + U(i,j-1) + Uold(i,j+1))/4.0_dp
           
           if (abs(Uold(i,j)-U(i,j)) > maxerr ) then
@@ -109,17 +119,19 @@ program poisson
       maxerr=0.0_dp
  
       do j = 2, N-1
-        do i = 2, N-1
          
-          U(i,j) = (U(i-1,j) + Uold(i+1,j) + U(i,j-1) + Uold(i,j+1))/4.0_dp
-          
-          if (abs(Uold(i,j)-U(i,j)) > maxerr ) then
+         do i = 2, N-1
+           U(i,j) = (U(i-1,j) + Uold(i+1,j) + U(i,j-1) + Uold(i,j+1))/4.0_dp
+           if (i == N/2 .and. j==N/2) then
+              U(i,j) = U(i,j) + Pi * e2 * N   ! dx = 1/N
+           end if
+              
+           if (abs(Uold(i,j)-U(i,j)) > maxerr ) then
              maxerr = abs(Uold(i,j) - U(i,j))
-          end if
-          
-          U(i,j) = (1-w)*Uold(i,j) + w*U(i,j)
-     
-        end do
+           end if
+           U(i,j) = (1-w)*Uold(i,j) + w*U(i,j)
+       end do
+       
         !Neumann di O(a^2) lungo x==1 e x==N
         U(1,j) = 4.0_dp/3.0_dp * U(2,j) - 1.0_dp/3.0_dp * U(3,j)
         U(N,j) = 4.0_dp/3.0_dp * U(N-1,j) - 1.0_dp/3.0_dp * U(N-2,j) 
